@@ -212,6 +212,16 @@ body {
     0 0 22px rgba(237,66,69,0.45);
 }
 
+.discord-activity {
+  min-height: 0;
+  margin-top: 7px;
+  color: rgba(255,255,255,0.48);
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.discord-activity:empty { display: none; }
+
 .views {
   position: absolute;
   left: 24px;
@@ -626,8 +636,9 @@ input[type="range"]::-moz-range-thumb {
     <div class="content">
       <div class="avatar">
         <img
+          id="discordAvatar"
           src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR43GdSI-vXUARMZ1apDyP1z5Zdg51TkzaeTpQH26RQAQ&s=10"
-          alt="Arb profile picture">
+          alt="Discord profile picture">
       </div>
 
       <div class="info">
@@ -636,12 +647,13 @@ input[type="range"]::-moz-range-thumb {
           <span class="typing-cursor">|</span>
         </div>
 
-        <div class="username">@arb_i</div>
+        <div class="username" id="discordUsername">@arb_i</div>
 
         <div class="status">
-          <span class="status-dot"></span>
-          <span>Do Not Disturb</span>
+          <span class="status-dot" id="discordStatusDot"></span>
+          <span id="discordStatusText">Loading status...</span>
         </div>
+        <div class="discord-activity" id="discordActivity" aria-live="polite"></div>
       </div>
     </div>
 
@@ -1062,31 +1074,194 @@ input[type="range"]::-moz-range-thumb {
   window.addEventListener('blur', () => finishDrag(null));
 })();
 
-/* Name typewriter */
-const name = "arb";
-const nameElement = document.getElementById("typedName");
+/* Live Discord profile + presence via Lanyard.
+   WebSocket updates arrive as Discord presence changes; REST polling is the fallback. */
+const DISCORD_USER_ID = "1548499637936197673";
+const discordNameElement = document.getElementById("typedName");
+const discordAvatarElement = document.getElementById("discordAvatar");
+const discordUsernameElement = document.getElementById("discordUsername");
+const discordStatusDot = document.getElementById("discordStatusDot");
+const discordStatusText = document.getElementById("discordStatusText");
+const discordActivityElement = document.getElementById("discordActivity");
 
-let nameIndex = 0;
-let isNameDeleting = false;
+let lanyardSocket = null;
+let lanyardHeartbeat = null;
+let lanyardReconnectTimer = null;
+let lanyardPollTimer = null;
+let lastPresenceUpdate = 0;
+let reconnectDelay = 2000;
 
-function typeWriterName() {
-  if (!isNameDeleting && nameIndex < name.length) {
-    nameIndex++;
-  } else if (isNameDeleting && nameIndex > 0) {
-    nameIndex--;
-  } else if (nameIndex === name.length) {
-    isNameDeleting = true;
-    setTimeout(typeWriterName, 10000);
-    return;
-  } else if (nameIndex === 0) {
-    isNameDeleting = false;
+function discordAvatarUrl(user) {
+  if (user.avatar) {
+    const animated = user.avatar.startsWith("a_");
+    const extension = animated ? "gif" : "png";
+    return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.${extension}?size=256`;
   }
 
-  nameElement.textContent = name.slice(0, nameIndex);
-  setTimeout(typeWriterName, isNameDeleting ? 150 : 300);
+  const defaultIndex = Number((BigInt(user.id) >> 22n) % 6n);
+  return `https://cdn.discordapp.com/embed/avatars/${defaultIndex}.png`;
 }
 
-typeWriterName();
+function renderDiscordPresence(data) {
+  if (!data) return;
+  const user = data.discord_user || {};
+  const displayName = user.global_name || user.display_name || user.username || "Discord user";
+  const username = user.username ? `@${user.username}` : "";
+
+  if (discordNameElement) discordNameElement.textContent = displayName;
+  if (discordUsernameElement) discordUsernameElement.textContent = username;
+  if (discordAvatarElement && user.id) {
+    discordAvatarElement.src = discordAvatarUrl(user);
+    discordAvatarElement.alt = `${displayName}'s Discord avatar`;
+  }
+
+  const status = data.discord_status || "offline";
+  const statusLabels = {
+    online: "Online",
+    idle: "Idle",
+    dnd: "Do Not Disturb",
+    offline: "Offline"
+  };
+  if (discordStatusText) {
+    discordStatusText.textContent = statusLabels[status] || "Status unavailable";
+    discordStatusText.dataset.loaded = "true";
+  }
+  if (discordStatusDot) {
+    discordStatusDot.dataset.status = status;
+    discordStatusDot.style.background =
+    status === "online" ? "#23a55a" :
+    status === "idle" ? "#f0b232" :
+    status === "dnd" ? "#ed4245" : "#747f8d";
+  discordStatusDot.style.boxShadow =
+    status === "online" ? "0 0 5px #23a55a, 0 0 12px rgba(35,165,90,.75)" :
+    status === "idle" ? "0 0 5px #f0b232, 0 0 12px rgba(240,178,50,.65)" :
+    status === "dnd" ? "0 0 5px #ed4245, 0 0 12px rgba(237,66,69,.75)" : "none";
+  }
+
+  const activities = (data.activities || []).filter(activity => activity.type !== 4);
+  const activity = activities[0];
+  if (activity) {
+    const details = [activity.name, activity.details, activity.state].filter(Boolean);
+    discordActivityElement.textContent = details.join(" · ");
+  } else {
+    discordActivityElement.textContent = "";
+  }
+
+  lastPresenceUpdate = Date.now();
+}
+
+async function updateDiscordPresence() {
+  try {
+    const response = await fetch(`https://api.lanyard.rest/v1/users/${DISCORD_USER_ID}`, {
+      cache: "no-store"
+    });
+    if (!response.ok) throw new Error(`Lanyard returned HTTP ${response.status}`);
+    const result = await response.json();
+    if (!result.success || !result.data || !result.data.discord_user) {
+      throw new Error("This Discord account is not being monitored by Lanyard yet.");
+    }
+    renderDiscordPresence(result.data);
+  } catch (error) {
+    if (discordNameElement && !discordNameElement.textContent.trim()) discordNameElement.textContent = "Discord profile unavailable";
+    if (discordStatusText && !discordStatusText.dataset.loaded) {
+      discordStatusText.textContent = "Presence unavailable";
+      if (discordActivityElement) discordActivityElement.textContent = "Check Lanyard opt-in and try again.";
+    }
+    console.warn("Discord presence update failed:", error);
+  }
+}
+
+function stopLanyardHeartbeat() {
+  if (lanyardHeartbeat) {
+    clearInterval(lanyardHeartbeat);
+    lanyardHeartbeat = null;
+  }
+}
+
+function connectLanyard() {
+  if (lanyardSocket && (lanyardSocket.readyState === WebSocket.OPEN ||
+                        lanyardSocket.readyState === WebSocket.CONNECTING)) return;
+
+  try {
+    lanyardSocket = new WebSocket("wss://api.lanyard.rest/socket");
+  } catch (error) {
+    scheduleLanyardReconnect();
+    return;
+  }
+
+  lanyardSocket.addEventListener("open", () => {
+    reconnectDelay = 2000;
+  });
+
+  lanyardSocket.addEventListener("message", event => {
+    let packet;
+    try {
+      packet = JSON.parse(event.data);
+    } catch (_) {
+      return;
+    }
+
+    // Lanyard opcode 1 is Hello; subscribe and begin the required heartbeat.
+    if (packet.op === 1) {
+      const heartbeatInterval = packet.d && packet.d.heartbeat_interval;
+      lanyardSocket.send(JSON.stringify({
+        op: 2,
+        d: { subscribe_to_id: DISCORD_USER_ID }
+      }));
+
+      stopLanyardHeartbeat();
+      if (heartbeatInterval) {
+        lanyardHeartbeat = setInterval(() => {
+          if (lanyardSocket && lanyardSocket.readyState === WebSocket.OPEN) {
+            lanyardSocket.send(JSON.stringify({ op: 3 }));
+          }
+        }, heartbeatInterval);
+      }
+      return;
+    }
+
+    // INIT_STATE and PRESENCE_UPDATE both carry the current presence payload.
+    if (packet.op === 0 && packet.d) {
+      renderDiscordPresence(packet.d);
+    }
+  });
+
+  lanyardSocket.addEventListener("error", () => {
+    try { lanyardSocket.close(); } catch (_) {}
+  });
+
+  lanyardSocket.addEventListener("close", () => {
+    stopLanyardHeartbeat();
+    scheduleLanyardReconnect();
+  });
+}
+
+function scheduleLanyardReconnect() {
+  if (lanyardReconnectTimer) return;
+  lanyardReconnectTimer = setTimeout(() => {
+    lanyardReconnectTimer = null;
+    connectLanyard();
+  }, reconnectDelay);
+  reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+}
+
+// REST keeps the card populated if WebSockets are unavailable or disconnected.
+updateDiscordPresence();
+connectLanyard();
+lanyardPollTimer = setInterval(() => {
+  if (!lanyardSocket || lanyardSocket.readyState !== WebSocket.OPEN ||
+      Date.now() - lastPresenceUpdate > 45000) {
+    updateDiscordPresence();
+  }
+}, 15000);
+
+/* Reconnect when the visitor returns to the tab. */
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    connectLanyard();
+    if (Date.now() - lastPresenceUpdate > 10000) updateDiscordPresence();
+  }
+});
 
 /* Quote typewriter */
 const bioMessages = [
