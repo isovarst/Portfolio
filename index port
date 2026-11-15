@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arb</title>
+
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+@property --angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #050505;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 0;
+  background: transparent;
+  color: white;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+#background {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  background: #050505;
+  z-index: -2;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.48);
+  z-index: -1;
+}
+
+/* Everything moves together as one centered object */
+.wrapper {
+  width: 550px;
+  max-width: calc(100vw - 36px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transform-style: preserve-3d;
+  will-change: transform;
+  transform-origin: center center;
+  backface-visibility: hidden;
+}
+
+/* Glass cards */
+.card {
+  position: relative;
+  width: 100%;
+  padding: 35px;
+  border-radius: 28px;
+  background: rgba(10,10,10,0.24);
+  transform-style: preserve-3d;
+  box-shadow: 0 25px 80px rgba(0,0,0,0.2);
+  isolation: isolate;
+}
+
+/* Moving border */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--angle),
+    transparent 0deg,
+    transparent 285deg,
+    rgba(255,255,255,0.05) 310deg,
+    rgba(255,255,255,0.95) 330deg,
+    rgba(255,255,255,0.15) 345deg,
+    transparent 360deg
+  );
+  animation: borderTravel 5s linear infinite;
+  pointer-events: none;
+  z-index: 3;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+@keyframes borderTravel {
+  to { --angle: 360deg; }
+}
+
+/* Cursor reflection */
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    rgba(255,255,255,0.09),
+    transparent 45%
+  );
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Profile */
+.profile-card {
+  min-height: 310px;
+  padding-bottom: 58px;
+}
+
+.content {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  position: relative;
+  z-index: 1;
+  transform: translateZ(45px);
+}
+
+.avatar {
+  width: 125px;
+  height: 125px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  transform: translateZ(25px);
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.info {
+  min-width: 0;
+  flex: 1;
+}
+
+.name {
+  min-height: 37px;
+  display: flex;
+  align-items: center;
+  font-size: 29px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+
+.username {
+  color: #888;
+  font-size: 13px;
+  margin-top: 5px;
+}
+
+.typing-cursor {
+  display: inline-block;
+  margin-left: 3px;
+  font-weight: 400;
+  animation: blink 0.5s steps(2, start) infinite;
+}
+
+@keyframes blink {
+  to { visibility: hidden; }
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 17px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #aaa;
+  font-size: 12px;
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #ed4245;
+  box-shadow:
+    0 0 5px #ed4245,
+    0 0 12px rgba(237,66,69,0.9),
+    0 0 22px rgba(237,66,69,0.45);
+}
+
+.views {
+  position: absolute;
+  left: 24px;
+  bottom: 17px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: rgba(255,255,255,0.45);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  z-index: 4;
+}
+
+.views img {
+  width: 15px;
+  height: 15px;
+  object-fit: contain;
+  opacity: 0.5;
+}
+
+.divider {
+  height: 1px;
+  width: 100%;
+  background: rgba(255,255,255,0.09);
+  margin: 28px 0 20px;
+}
+
+.quote-area {
+  min-height: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+  transform: translateZ(25px);
+}
+
+.quote {
+  color: #aaa;
+  font-size: 13px;
+  letter-spacing: 0.1px;
+  min-height: 18px;
+  overflow-wrap: anywhere;
+}
+
+.discord-button {
+  position: absolute;
+  right: 35px;
+  top: 35px;
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.06);
+  cursor: pointer;
+  transition: background-color .2s ease, box-shadow .2s ease, border-color .2s ease;
+  z-index: 4;
+  transform: translateZ(35px);
+}
+
+.discord-button:hover {
+  background: rgba(255,255,255,0.14);
+  transform: translateZ(35px);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.10), 0 5px 18px rgba(0,0,0,0.16);
+}
+
+.discord-button svg {
+  width: 19px;
+  height: 19px;
+  fill: white;
+}
+
+.footer {
+  position: absolute;
+  bottom: 17px;
+  right: 24px;
+  color: #555;
+  font-size: 10px;
+  z-index: 4;
+}
+
+/* Music group */
+.music-group {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transform-style: preserve-3d;
+}
+
+/* Music panel */
+.music-card {
+  padding: 24px 28px;
+  min-height: 150px;
+  border-radius: 25px;
+}
+
+.music-content {
+  position: relative;
+  z-index: 1;
+  transform: translateZ(35px);
+}
+
+.music-heading {
+  color: #aaa;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.track-title {
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 17px;
+  min-height: 17px;
+}
+
+.track-progress {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  color: #888;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+input[type="range"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 3px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.2);
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 0 8px rgba(255,255,255,0.5);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: none;
+  border-radius: 50%;
+  background: white;
+}
+
+/* Make the volume control's circular handle stand out when targeted. */
+.volume-slider:hover::-webkit-slider-thumb,
+.volume-slider:focus-visible::-webkit-slider-thumb,
+.volume-slider:active::-webkit-slider-thumb {
+  transform: scale(1.55);
+  box-shadow: 0 0 0 5px rgba(255,255,255,.13), 0 0 12px rgba(255,255,255,.75);
+}
+.volume-slider:hover::-moz-range-thumb,
+.volume-slider:focus-visible::-moz-range-thumb,
+.volume-slider:active::-moz-range-thumb {
+  transform: scale(1.55);
+  box-shadow: 0 0 0 5px rgba(255,255,255,.13), 0 0 12px rgba(255,255,255,.75);
+}
+.volume-slider::-webkit-slider-thumb,
+.volume-slider::-moz-range-thumb {
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+
+.music-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 25px;
+  margin-top: 22px;
+}
+
+.music-button {
+  width: 43px;
+  height: 43px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #aaa;
+  cursor: pointer;
+  transition: color .2s ease, background-color .2s ease;
+}
+
+.music-button:hover {
+  color: white;
+  background: rgba(255,255,255,0.1);
+  transform: none;
+}
+
+.music-button svg {
+  width: 17px;
+  height: 17px;
+  fill: currentColor;
+}
+
+.music-button.main {
+  width: 50px;
+  height: 50px;
+  color: #111;
+  background: white;
+}
+
+.music-button.main:hover {
+  transform: none;
+}
+
+/* Separate volume box */
+.volume-card {
+  width: 230px;
+  max-width: 75%;
+  align-self: center;
+  padding: 14px 19px;
+  border-radius: 30px;
+  background: rgba(10,10,10,0.24);
+  box-shadow: 0 15px 40px rgba(0,0,0,0.16);
+  transform-style: preserve-3d;
+  isolation: isolate;
+}
+
+.volume-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transform: translateZ(25px);
+  position: relative;
+  z-index: 1;
+}
+
+.volume-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  fill: #aaa;
+}
+
+.volume-slider {
+  flex: 1;
+}
+
+.volume-value {
+  color: #888;
+  font-size: 10px;
+  min-width: 27px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Mobile */
+@media (max-width: 520px) {
+  .wrapper {
+    gap: 12px;
+  }
+
+  .music-group {
+    gap: 12px;
+  }
+
+  .profile-card {
+    padding: 25px 25px 58px;
+    min-height: 280px;
+  }
+
+  .content {
+    gap: 18px;
+  }
+
+  .avatar {
+    width: 90px;
+    height: 90px;
+  }
+
+  .name {
+    font-size: 25px;
+  }
+
+  .discord-button {
+    top: 18px;
+    right: 18px;
+    width: 42px;
+    height: 42px;
+  }
+
+  .views {
+    left: 19px;
+    bottom: 17px;
+  }
+
+  .footer {
+    right: 19px;
+    bottom: 17px;
+  }
+
+  .divider {
+    margin-top: 24px;
+  }
+
+  .music-card {
+    padding: 22px;
+  }
+}
+
+@media (max-width: 370px) {
+  .content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .profile-card {
+    padding: 25px 25px 58px;
+  }
+}
+
+@media (max-height: 680px) {
+  .wrapper {
+    zoom: .88;
+  }
+}
+
+@media (max-height: 560px) {
+  .wrapper {
+    zoom: .76;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card::before {
+    animation: none;
+  }
+
+  .typing-cursor {
+    animation: none;
+  }
+}
+
+/* Four-corner cursor: compact rotating frame at rest, expanded around controls */
+@media (hover: hover) and (pointer: fine) {
+  html.custom-cursor, html.custom-cursor * { cursor: none !important; }
+  .cursor-frame {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 0;
+    z-index: 2147483000;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .2s ease;
+  }
+  .cursor-frame.visible { opacity: 1; }
+  .cursor-frame.avatar-mode {
+    width: 0;
+    height: 0;
+  }
+  .cursor-frame.avatar-mode i { display: block; }
+  .cursor-frame i {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 13px;
+    height: 13px;
+    border-color: #fff;
+    border-style: solid;
+    border-width: 0;
+    filter: drop-shadow(0 0 2px #000);
+    will-change: transform;
+  }
+  .cursor-frame i:nth-child(1) { border-top-width: 1.5px; border-left-width: 1.5px; border-top-left-radius: 4px; }
+  .cursor-frame i:nth-child(2) { border-top-width: 1.5px; border-right-width: 1.5px; border-top-right-radius: 4px; }
+  .cursor-frame i:nth-child(3) { border-bottom-width: 1.5px; border-right-width: 1.5px; border-bottom-right-radius: 4px; }
+  .cursor-frame i:nth-child(4) { border-bottom-width: 1.5px; border-left-width: 1.5px; border-bottom-left-radius: 4px; }
+}
+</style>
+</head>
+
+<body>
+
+<video id="background" muted loop playsinline preload="none" aria-hidden="true"></video>
+
+<div class="overlay"></div>
+
+<!-- The entire page content is inside this one 3D object -->
+<div class="wrapper" id="mainObject">
+
+  <main class="card profile-card" id="card">
+
+    <button class="discord-button" id="discordButton"
+      title="Open Discord profile"
+      aria-label="Open Discord profile">
+      <svg viewBox="0 0 24 24">
+        <path d="M19.73 5.1a18.2 18.2 0 0 0-4.5-1.4l-.55 1.12a16.8 16.8 0 0 0-5.1 0L9.03 3.7a18.2 18.2 0 0 0-4.5 1.4C1.68 9.3.91 13.4 1.3 17.45a18.2 18.2 0 0 0 5.52 2.8l1.2-1.96a11.8 11.8 0 0 1-1.9-.92l.47-.37a13 13 0 0 0 11.82 0l.47.37c-.61.36-1.25.67-1.9.92l1.2 1.96a18.2 18.2 0 0 0 5.52-2.8c.47-4.7-.8-8.75-3.97-12.35ZM8.55 14.9c-1.1 0-2-.99-2-2.2s.88-2.2 2-2.2 2.02.99 2 2.2c0 1.21-.88 2.2-2 2.2Zm6.9 0c-1.1 0-2-.99-2-2.2s.88-2.2 2-2.2 2.02.99 2 2.2c0 1.21-.88 2.2-2 2.2Z"/>
+      </svg>
+    </button>
+
+    <div class="content">
+      <div class="avatar">
+        <img
+          src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR43GdSI-vXUARMZ1apDyP1z5Zdg51TkzaeTpQH26RQAQ&s=10"
+          alt="Arb profile picture">
+      </div>
+
+      <div class="info">
+        <div class="name">
+          <span id="typedName"></span>
+          <span class="typing-cursor">|</span>
+        </div>
+
+        <div class="username">@arb_i</div>
+
+        <div class="status">
+          <span class="status-dot"></span>
+          <span>Do Not Disturb</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="quote-area">
+      <div class="quote">
+        <span id="typedQuote"></span>
+        <span class="typing-cursor">|</span>
+      </div>
+    </div>
+
+    <div class="views">
+      <img
+        src="https://img.icons8.com/ios-glyphs/30/FFFFFF/visible--v1.png"
+        alt="">
+      <span id="viewCount">0 views</span>
+    </div>
+
+    <div class="footer">© Arb</div>
+  </main>
+
+  <!-- Music and volume remain separate boxes -->
+  <div class="music-group">
+
+    <section class="card music-card" id="musicCard">
+      <div class="music-content">
+
+        <div class="music-heading">now playing</div>
+        <div class="track-title" id="trackTitle">Worlds A Fuck</div>
+
+        <div class="track-progress">
+          <span id="currentTime">0:00</span>
+          <input type="range" id="seekSlider"
+            min="0" max="100" value="0" step="0.1"
+            aria-label="Seek through track">
+          <span id="duration">0:00</span>
+        </div>
+
+        <div class="music-controls">
+
+          <button class="music-button" id="previousButton"
+            aria-label="Previous track" title="Previous">
+            <svg viewBox="0 0 24 24">
+              <path d="M6 5h2v14H6zm13 0v14L9 12z"/>
+            </svg>
+          </button>
+
+          <button class="music-button main" id="playButton"
+            aria-label="Play" title="Play">
+            <svg id="playIcon" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+            <svg id="pauseIcon" viewBox="0 0 24 24" style="display:none">
+              <path d="M6 5h4v14H6zm8 0h4v14h-4z"/>
+            </svg>
+          </button>
+
+          <button class="music-button" id="nextButton"
+            aria-label="Next track" title="Next">
+            <svg viewBox="0 0 24 24">
+              <path d="M16 5h2v14h-2zM5 5v14l10-7z"/>
+            </svg>
+          </button>
+
+        </div>
+      </div>
+    </section>
+
+    <section class="volume-card" id="volumeCard">
+      <div class="volume-content">
+
+        <svg class="volume-icon" viewBox="0 0 24 24">
+          <path d="M3 9v6h4l5 4V5L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4.03v8.05A4.5 4.5 0 0 0 16.5 12zm-2.5-9.3v2.06a8 8 0 0 1 0 14.48v2.06a10 10 0 0 0 0-18.6z"/>
+        </svg>
+
+        <input type="range" class="volume-slider"
+          id="volumeSlider" min="0" max="1"
+          value="0.27" step="0.01"
+          aria-label="Music volume">
+
+        <span class="volume-value" id="volumeValue">27%</span>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+
+
+<div class="cursor-frame" id="cursorFrame" aria-hidden="true">
+  <i></i><i></i><i></i><i></i>
+</div>
+
+<audio id="audio" preload="none" autoplay></audio>
+
+<script>
+
+/* Defer the large decorative background request until the page has rendered. */
+(function startBackgroundVideo() {
+  const video = document.getElementById("background");
+  const videoUrl = "https://raw.githubusercontent.com/isovarst/Portfolio/main/Nissan%20Silvia%20S13%20Gloomy%20Rain%20Live%20Wallpaper%204K%20%281%29.mp4";
+
+  function start() {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    video.src = videoUrl;
+    video.load();
+    const play = () => video.play().catch(() => {});
+    if (video.readyState >= 2) play();
+    else video.addEventListener("canplay", play, { once: true });
+  }
+
+  const schedule = () => window.setTimeout(start, 500);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", schedule, { once: true });
+  } else {
+    schedule();
+  }
+})();
+
+/* Stable corner cursor with forgiving hit areas and target hysteresis. */
+(function initCornerCursor() {
+  const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+  if (!finePointer || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+  const cursor = document.getElementById("cursorFrame");
+  const corners = Array.from(cursor.querySelectorAll("i"));
+  const selector = ".avatar, button, a, input[type='range']";
+  document.documentElement.classList.add("custom-cursor");
+
+  let pointerX = innerWidth / 2;
+  let pointerY = innerHeight / 2;
+  let target = null;
+  let lockedTarget = null;
+  let angle = 0;
+  let positions = corners.map(() => ({ x: pointerX, y: pointerY }));
+  let lastTime = 0;
+  let visible = false;
+
+  // Larger invisible hit areas help thin controls and circular buttons feel consistent.
+  function hitPadding(element) {
+    if (element.matches(".avatar")) return 9;
+    if (element.matches("input[type='range']")) return 19;
+    if (element.matches("button, a")) return 16;
+    return 12;
+  }
+
+  function insideExpandedRect(element, x, y, extra = 0) {
+    if (!element || !element.isConnected) return false;
+    const r = element.getBoundingClientRect();
+    const pad = hitPadding(element) + extra;
+    return x >= r.left - pad && x <= r.right + pad &&
+           y >= r.top - pad && y <= r.bottom + pad;
+  }
+
+  function findTarget(x, y) {
+    // Keep the current target until the pointer has clearly left its forgiving area.
+    if (target && insideExpandedRect(target, x, y, 9)) return target;
+
+    let best = null;
+    let bestDistance = Infinity;
+    document.querySelectorAll(selector).forEach(element => {
+      if (!insideExpandedRect(element, x, y)) return;
+      const r = element.getBoundingClientRect();
+      const cx = Math.max(r.left, Math.min(x, r.right));
+      const cy = Math.max(r.top, Math.min(y, r.bottom));
+      const distance = Math.hypot(x - cx, y - cy);
+      if (distance < bestDistance) {
+        best = element;
+        bestDistance = distance;
+      }
+    });
+    return best;
+  }
+
+  function move(event) {
+    pointerX = event.clientX;
+    pointerY = event.clientY;
+    if (!lockedTarget) target = findTarget(pointerX, pointerY);
+    visible = true;
+    cursor.classList.add("visible");
+    if (!cursorFrame) cursorFrame = requestAnimationFrame(animate);
+  }
+
+  let cursorFrame = null;
+  let pendingExpandedClick = null;
+
+  // Resolve clicks from the pointer's real coordinates, not from the animated
+  // corner frame's current position/target. This makes buttons clickable even
+  // while the hover brackets are still moving into place.
+  function findClickableTarget(x, y) {
+    const direct = document.elementFromPoint(x, y);
+    const directControl = direct && direct.closest ? direct.closest("button, a") : null;
+    if (directControl && directControl.isConnected) return directControl;
+
+    let best = null;
+    let bestDistance = Infinity;
+    document.querySelectorAll("button, a").forEach(element => {
+      if (!insideExpandedRect(element, x, y)) return;
+      const r = element.getBoundingClientRect();
+      const cx = Math.max(r.left, Math.min(x, r.right));
+      const cy = Math.max(r.top, Math.min(y, r.bottom));
+      const distance = Math.hypot(x - cx, y - cy);
+      if (distance < bestDistance) {
+        best = element;
+        bestDistance = distance;
+      }
+    });
+    return best;
+  }
+
+  document.addEventListener("pointermove", move, { passive: true });
+  document.addEventListener("pointerdown", event => {
+    pointerX = event.clientX;
+    pointerY = event.clientY;
+
+    // Prefer a real range input under the pointer so dragging remains native
+    // and immediate, even if the cursor frame is animating from another target.
+    const direct = document.elementFromPoint(pointerX, pointerY);
+    const directRange = direct && direct.matches && direct.matches("input[type='range']")
+      ? direct : null;
+    const hit = directRange || findTarget(pointerX, pointerY);
+
+    if (hit && hit.matches("input[type='range']")) {
+      lockedTarget = hit;
+      target = hit;
+      return;
+    }
+
+    if (event.button !== 0) return;
+    const clickable = findClickableTarget(pointerX, pointerY);
+    if (!clickable) return;
+
+    const r = clickable.getBoundingClientRect();
+    const isInsideElement = pointerX >= r.left && pointerX <= r.right &&
+                            pointerY >= r.top && pointerY <= r.bottom;
+    if (!isInsideElement) {
+      pendingExpandedClick = { element: clickable, pointerId: event.pointerId };
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  }, true);
+
+  function finishExpandedClick(event) {
+    const pending = pendingExpandedClick;
+    if (!pending || (event && event.pointerId !== pending.pointerId)) return;
+    pendingExpandedClick = null;
+    if (event && pending.element.isConnected &&
+        insideExpandedRect(pending.element, event.clientX, event.clientY)) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      pending.element.click();
+    }
+  }
+  document.addEventListener("pointerup", finishExpandedClick, true);
+  document.addEventListener("pointercancel", () => { pendingExpandedClick = null; }, true);
+
+  function releaseTarget() {
+    lockedTarget = null;
+    target = findTarget(pointerX, pointerY);
+  }
+  document.addEventListener("pointerup", releaseTarget, true);
+  document.addEventListener("pointercancel", releaseTarget, true);
+  window.addEventListener("blur", releaseTarget);
+  document.addEventListener("pointerleave", () => {
+    if (!lockedTarget) {
+      visible = false;
+      cursor.classList.remove("visible");
+    }
+  });
+
+  function animate(time) {
+    const dt = lastTime ? Math.min(40, time - lastTime) : 16;
+    lastTime = time;
+
+    let goals;
+    let rotation;
+    let size = 13;
+
+    if (lockedTarget && lockedTarget.isConnected) target = lockedTarget;
+    else if (target && !insideExpandedRect(target, pointerX, pointerY, 9)) {
+      target = findTarget(pointerX, pointerY);
+    }
+
+    if (target && target.isConnected) {
+      const isAvatar = target.classList.contains("avatar");
+      cursor.classList.toggle("avatar-mode", isAvatar);
+      const rect = target.getBoundingClientRect();
+      let left, right, top, bottom;
+
+      if (target.classList.contains("volume-slider")) {
+        // Visually target the draggable white thumb, while keeping the range input
+        // itself as the pointer target so native dragging remains reliable.
+        const min = Number(target.min || 0);
+        const max = Number(target.max || 100);
+        const value = Number(target.value);
+        const ratio = max > min ? Math.max(0, Math.min(1, (value - min) / (max - min))) : 0;
+        const thumbSize = 10;
+        const centerX = rect.left + thumbSize / 2 + ratio * Math.max(0, rect.width - thumbSize);
+        const centerY = rect.top + rect.height / 2;
+        const thumbPad = 7;
+        left = centerX - thumbSize / 2 - thumbPad;
+        right = centerX + thumbSize / 2 + thumbPad;
+        top = centerY - thumbSize / 2 - thumbPad;
+        bottom = centerY + thumbSize / 2 + thumbPad;
+      } else {
+        const pad = isAvatar ? 7 : 9;
+        left = rect.left - pad;
+        right = rect.right + pad;
+        top = rect.top - pad;
+        bottom = rect.bottom + pad;
+      }
+      goals = [
+        [left, top], [right - size, top],
+        [right - size, bottom - size], [left, bottom - size]
+      ];
+      rotation = 0;
+      size = Math.min(18, Math.max(11, Math.min(right - left, bottom - top) / 5));
+    } else {
+      cursor.classList.remove("avatar-mode");
+      angle += dt * 0.065;
+      const radius = 9;
+      const a = angle * Math.PI / 180;
+      const c = Math.cos(a), s = Math.sin(a);
+      goals = [[-radius, -radius], [radius, -radius], [radius, radius], [-radius, radius]]
+        .map(([x, y]) => [pointerX + x * c - y * s, pointerY + x * s + y * c]);
+      rotation = angle;
+    }
+
+    // Frame-rate-independent smoothing prevents sudden jumps between neighboring targets.
+    const ease = 1 - Math.exp(-dt / (target ? 105 : 62));
+    corners.forEach((corner, i) => {
+      positions[i].x += (goals[i][0] - positions[i].x) * ease;
+      positions[i].y += (goals[i][1] - positions[i].y) * ease;
+      corner.style.width = size + "px";
+      corner.style.height = size + "px";
+      corner.style.transform = `translate3d(${positions[i].x}px,${positions[i].y}px,0) rotate(${rotation}deg)`;
+    });
+    if (visible && !document.hidden) {
+      cursorFrame = requestAnimationFrame(animate);
+    } else {
+      cursorFrame = null;
+      lastTime = 0;
+    }
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && visible && !cursorFrame) {
+      cursorFrame = requestAnimationFrame(animate);
+    }
+  });
+})();
+
+/* Reliable click-and-drag handling for both range sliders. */
+(function enableRangeDragging() {
+  const sliders = Array.from(document.querySelectorAll('input[type="range"]'));
+  let activeSlider = null;
+  let activePointerId = null;
+
+  function setFromPointer(slider, clientX) {
+    const rect = slider.getBoundingClientRect();
+    const thumbWidth = 10;
+    const usableWidth = Math.max(1, rect.width - thumbWidth);
+    const ratio = Math.max(0, Math.min(1,
+      (clientX - (rect.left + thumbWidth / 2)) / usableWidth
+    ));
+    const min = Number(slider.min || 0);
+    const max = Number(slider.max || 100);
+    const step = Number(slider.step || 1);
+    let value = min + ratio * (max - min);
+    if (Number.isFinite(step) && step > 0) {
+      value = min + Math.round((value - min) / step) * step;
+    }
+    value = Math.max(min, Math.min(max, value));
+    const decimals = (String(step).split('.')[1] || '').length;
+    slider.value = value.toFixed(Math.min(8, decimals));
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  function sliderAtPoint(x, y) {
+    const direct = document.elementFromPoint(x, y);
+    if (direct && direct.matches && direct.matches('input[type="range"]')) return direct;
+    return sliders.find(slider => {
+      const r = slider.getBoundingClientRect();
+      const pad = 19;
+      return x >= r.left - pad && x <= r.right + pad &&
+             y >= r.top - pad && y <= r.bottom + pad;
+    }) || null;
+  }
+
+  document.addEventListener('pointerdown', event => {
+    if (event.button !== 0 || activeSlider) return;
+    const slider = sliderAtPoint(event.clientX, event.clientY);
+    if (!slider) return;
+
+    activeSlider = slider;
+    activePointerId = event.pointerId;
+    event.preventDefault();
+    try { slider.setPointerCapture(event.pointerId); } catch (_) {}
+    setFromPointer(slider, event.clientX);
+  }, true);
+
+  document.addEventListener('pointermove', event => {
+    if (!activeSlider || event.pointerId !== activePointerId) return;
+    event.preventDefault();
+    setFromPointer(activeSlider, event.clientX);
+  }, { capture: true, passive: false });
+
+  function finishDrag(event) {
+    if (!activeSlider || (event && event.pointerId !== activePointerId)) return;
+    const slider = activeSlider;
+    activeSlider = null;
+    activePointerId = null;
+    slider.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  document.addEventListener('pointerup', finishDrag, true);
+  document.addEventListener('pointercancel', finishDrag, true);
+  window.addEventListener('blur', () => finishDrag(null));
+})();
+
+/* Name typewriter */
+const name = "arb";
+const nameElement = document.getElementById("typedName");
+
+let nameIndex = 0;
+let isNameDeleting = false;
+
+function typeWriterName() {
+  if (!isNameDeleting && nameIndex < name.length) {
+    nameIndex++;
+  } else if (isNameDeleting && nameIndex > 0) {
+    nameIndex--;
+  } else if (nameIndex === name.length) {
+    isNameDeleting = true;
+    setTimeout(typeWriterName, 10000);
+    return;
+  } else if (nameIndex === 0) {
+    isNameDeleting = false;
+  }
+
+  nameElement.textContent = name.slice(0, nameIndex);
+  setTimeout(typeWriterName, isNameDeleting ? 150 : 300);
+}
+
+typeWriterName();
+
+/* Quote typewriter */
+const bioMessages = [
+  "f1 racers r tuff",
+  "goated ig",
+  "wasm rip",
+  "audio.mp3",
+  "\"Hello, World!\"",
+  "top paster",
+  "\"larp larp larp sahur\"",
+  "\"works fine for me\"",
+  "git clone",
+  "\"ill fix it later\"",
+];
+
+const quoteElement = document.getElementById("typedQuote");
+
+let bioIndex = 0;
+let bioMessageIndex = 0;
+let isBioDeleting = false;
+
+function typeWriterBio() {
+  const currentMessage = bioMessages[bioMessageIndex];
+
+  if (!isBioDeleting && bioIndex < currentMessage.length) {
+    bioIndex++;
+  } else if (isBioDeleting && bioIndex > 0) {
+    bioIndex--;
+  } else if (bioIndex === currentMessage.length) {
+    isBioDeleting = true;
+    setTimeout(typeWriterBio, 2000);
+    return;
+  } else if (bioIndex === 0 && isBioDeleting) {
+    isBioDeleting = false;
+    bioMessageIndex = (bioMessageIndex + 1) % bioMessages.length;
+  }
+
+  quoteElement.textContent = currentMessage.slice(0, bioIndex);
+  setTimeout(typeWriterBio, isBioDeleting ? 75 : 150);
+}
+
+typeWriterBio();
+
+/* Local view counter */
+const viewCountElement = document.getElementById("viewCount");
+
+try {
+  const savedViews = Number(localStorage.getItem("arb-profile-views") || 0);
+  const newViews = Math.max(savedViews, 1273) + 1;
+
+  localStorage.setItem("arb-profile-views", newViews);
+  viewCountElement.textContent =
+    `${newViews.toLocaleString()} ${newViews === 1 ? "view" : "views"}`;
+} catch {
+  viewCountElement.textContent = "views";
+}
+
+/* Stable spring-based 3D tilt. Coordinates use the viewport, not the transformed
+   element bounds, preventing the tilt from feeding back into its own pointer math. */
+const mainObject = document.getElementById("mainObject");
+const isTouch = window.matchMedia("(pointer: coarse)").matches;
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+if (!isTouch && !reduceMotion) {
+  let targetX = 0, targetY = 0;
+  let currentX = 0, currentY = 0;
+  let velocityX = 0, velocityY = 0;
+  let frame = null;
+  let lastTime = 0;
+  let active = false;
+
+  function animateTilt(time) {
+    const dt = lastTime ? Math.min((time - lastTime) / 16.67, 2) : 1;
+    lastTime = time;
+    const stiffness = 0.085;
+    const damping = 0.82;
+    velocityX = (velocityX + (targetX - currentX) * stiffness * dt) * Math.pow(damping, dt);
+    velocityY = (velocityY + (targetY - currentY) * stiffness * dt) * Math.pow(damping, dt);
+    currentX += velocityX * dt;
+    currentY += velocityY * dt;
+
+    mainObject.style.transform = `perspective(1100px) rotateX(${currentX}deg) rotateY(${currentY}deg)`;
+
+    const settled = Math.abs(targetX-currentX) < .015 && Math.abs(targetY-currentY) < .015 &&
+      Math.abs(velocityX) < .015 && Math.abs(velocityY) < .015;
+    if (!active && settled) {
+      currentX = currentY = velocityX = velocityY = 0;
+      mainObject.style.transform = "perspective(1100px) rotateX(0deg) rotateY(0deg)";
+      frame = null;
+      lastTime = 0;
+      return;
+    }
+    frame = requestAnimationFrame(animateTilt);
+  }
+
+  function updateTilt(event) {
+    const nx = (event.clientX / Math.max(1, window.innerWidth) - .5) * 2;
+    const ny = (event.clientY / Math.max(1, window.innerHeight) - .5) * 2;
+    targetY = Math.max(-1, Math.min(1, nx)) * 7;
+    targetX = Math.max(-1, Math.min(1, -ny)) * 7;
+    active = true;
+    if (!frame) frame = requestAnimationFrame(animateTilt);
+  }
+
+  function resetTilt() {
+    targetX = targetY = 0;
+    active = false;
+    if (!frame) frame = requestAnimationFrame(animateTilt);
+  }
+
+  document.addEventListener("pointermove", updateTilt, { passive: true });
+  document.addEventListener("pointerleave", resetTilt);
+  window.addEventListener("blur", resetTilt);
+}
+
+/* Discord redirect */
+document.getElementById("discordButton").addEventListener("click", () => {
+  window.location.href = "https://discord.com/users/1548499637936197673";
+});
+
+/* Music player */
+const tracks = [
+  {
+    title: "I Don't Like",
+    url: "https://raw.githubusercontent.com/isovarst/Portfolio/main/chiefkeef-idontlike.mp3"
+  },
+  {
+    title: "Save Me",
+    url: "https://raw.githubusercontent.com/isovarst/Portfolio/main/chiefkeef-saveme.mp3"
+  },
+  {
+    title: "Laughin' to the Bank",
+    url: "https://raw.githubusercontent.com/isovarst/Portfolio/main/laughin-to-the-bank.mp3"
+  },
+  {
+    title: "Marceline",
+    url: "https://raw.githubusercontent.com/isovarst/Portfolio/main/lilgodan-marceline.mp3"
+  },
+  {
+    title: "Worlds A Fuck",
+    url: "https://raw.githubusercontent.com/isovarst/Portfolio/main/worldsafuck.mp3"
+  }
+];
+
+const audio = document.getElementById("audio");
+const playButton = document.getElementById("playButton");
+const playIcon = document.getElementById("playIcon");
+const pauseIcon = document.getElementById("pauseIcon");
+const previousButton = document.getElementById("previousButton");
+const nextButton = document.getElementById("nextButton");
+const seekSlider = document.getElementById("seekSlider");
+const volumeSlider = document.getElementById("volumeSlider");
+const volumeValue = document.getElementById("volumeValue");
+const currentTimeDisplay = document.getElementById("currentTime");
+const durationDisplay = document.getElementById("duration");
+const trackTitle = document.getElementById("trackTitle");
+
+let currentTrack = 4;
+let isSeeking = false;
+let userStartedPlayback = false;
+
+function formatTime(seconds) {
+  if (!Number.isFinite(seconds)) return "0:00";
+
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
+function updatePlayButton() {
+  const playing = !audio.paused;
+
+  playIcon.style.display = playing ? "none" : "block";
+  pauseIcon.style.display = playing ? "block" : "none";
+
+  playButton.setAttribute("aria-label", playing ? "Pause" : "Play");
+  playButton.title = playing ? "Pause" : "Play";
+}
+
+function loadTrack(index, autoplay = false) {
+  currentTrack = (index + tracks.length) % tracks.length;
+
+  audio.src = tracks[currentTrack].url;
+  trackTitle.textContent = tracks[currentTrack].title;
+  audio.load();
+
+  seekSlider.value = 0;
+  currentTimeDisplay.textContent = "0:00";
+  durationDisplay.textContent = "0:00";
+
+  if (autoplay) {
+    audio.play().then(() => {
+      userStartedPlayback = true;
+    }).catch(updatePlayButton);
+  } else {
+    updatePlayButton();
+  }
+}
+
+async function startMusic() {
+  if (!audio.paused) return;
+
+  audio.volume = Number(volumeSlider.value);
+
+  try {
+    await audio.play();
+    userStartedPlayback = true;
+  } catch (error) {
+    updatePlayButton();
+  }
+}
+
+/* Start at 27% volume on Worlds A Fuck */
+audio.volume = 0.27;
+volumeSlider.value = 0.27;
+volumeValue.textContent = "27%";
+
+loadTrack(4);
+startMusic();
+
+/* Retry autoplay if the browser blocks it initially */
+function retryAutoplay() {
+  if (!userStartedPlayback && audio.paused) {
+    startMusic();
+  }
+
+  document.removeEventListener("pointerdown", retryAutoplay);
+  document.removeEventListener("keydown", retryAutoplay);
+  document.removeEventListener("touchstart", retryAutoplay);
+}
+
+document.addEventListener("pointerdown", retryAutoplay);
+document.addEventListener("keydown", retryAutoplay);
+document.addEventListener("touchstart", retryAutoplay);
+
+/* Play / pause */
+playButton.addEventListener("click", () => {
+  if (audio.paused) {
+    startMusic();
+  } else {
+    audio.pause();
+  }
+});
+
+/* Track navigation */
+previousButton.addEventListener("click", () => {
+  userStartedPlayback = true;
+  loadTrack(currentTrack - 1, true);
+});
+
+nextButton.addEventListener("click", () => {
+  userStartedPlayback = true;
+  loadTrack(currentTrack + 1, true);
+});
+
+/* Automatically advance */
+audio.addEventListener("ended", () => {
+  loadTrack(currentTrack + 1, true);
+});
+
+/* Track progress */
+audio.addEventListener("loadedmetadata", () => {
+  durationDisplay.textContent = formatTime(audio.duration);
+});
+
+audio.addEventListener("timeupdate", () => {
+  if (!isSeeking && Number.isFinite(audio.duration) && audio.duration > 0) {
+    seekSlider.value = (audio.currentTime / audio.duration) * 100;
+  }
+
+  currentTimeDisplay.textContent = formatTime(audio.currentTime);
+});
+
+seekSlider.addEventListener("input", () => {
+  isSeeking = true;
+
+  if (Number.isFinite(audio.duration)) {
+    const newTime = (Number(seekSlider.value) / 100) * audio.duration;
+    currentTimeDisplay.textContent = formatTime(newTime);
+  }
+});
+
+seekSlider.addEventListener("change", () => {
+  if (Number.isFinite(audio.duration)) {
+    audio.currentTime = (Number(seekSlider.value) / 100) * audio.duration;
+  }
+
+  isSeeking = false;
+});
+
+/* Volume */
+volumeSlider.addEventListener("input", () => {
+  audio.volume = Number(volumeSlider.value);
+  volumeValue.textContent = `${Math.round(audio.volume * 100)}%`;
+});
+
+/* Keep play/pause icon accurate */
+audio.addEventListener("play", updatePlayButton);
+audio.addEventListener("pause", updatePlayButton);
+audio.addEventListener("error", updatePlayButton);
+</script>
+
+</body>
+</html>
